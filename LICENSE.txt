@@ -1,0 +1,10 @@
+Proprietary Software License
+
+Copyright (c) 2026 Lexip
+All rights reserved.
+
+This SDK code layout, specification tier, and asset manifest repository are strictly proprietary.
+Access, usage, and compilation are reserved exclusively for approved technology partners,
+paying clients, or verified designated entities bound by the framework EULA. Distributed
+deployment files must pass positive definite integrity validations before runtime execution loops
+initialize.

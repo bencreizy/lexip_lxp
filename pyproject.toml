@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lexip"
+version = "1.0.0"
+description = "Lexip Unified Runtime Engine"
+dependencies = [
+    "numpy",
+    "scipy",
+    "opencv-python",
+    "scikit-learn",
+    "PySide6",
+    "PyOpenGL"
+]
+
+[project.scripts]
+lexip = "layer7_extensions.lexip_cli:main"

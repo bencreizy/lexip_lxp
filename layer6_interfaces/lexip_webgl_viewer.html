@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lexip Vector Viewer</title>
+<style>
+body { margin: 0; overflow: hidden; background: #111; color: white; font-family: sans-serif; }
+#fileInput { position: absolute; top: 10px; left: 10px; z-index: 10; }
+</style>
+</head>
+<body>
+<input type="file" id="fileInput" accept=".lxp">
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let curves = [], scale = 1.0, offsetX = 0, offsetY = 0, dragging = false, lastX = 0, lastY = 0;
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+}
+window.addEventListener("resize", resize);
+
+document.getElementById("fileInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        const data = JSON.parse(evt.target.result);
+        curves = data.curves;
+        draw();
+    };
+    reader.readAsText(file);
+});
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+    for (const curve of curves) {
+        const [r, g, b] = curve.color;
+        ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.lineWidth = curve.thickness;
+        ctx.beginPath();
+        for (let i = 0; i < curve.points.length; i++) {
+            if (i === 0) ctx.moveTo(curve.points[i][0], curve.points[i][1]);
+            else ctx.lineTo(curve.points[i][0], curve.points[i][1]);
+        }
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+canvas.addEventListener("mousedown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+canvas.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    offsetX += e.clientX - lastX;
+    offsetY += e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    draw();
+});
+canvas.addEventListener("mouseup", () => dragging = false);
+window.onload = resize;
+</script>
+</body>
+</html>

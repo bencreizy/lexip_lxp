@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lexip Web Vector Editor</title>
+<style>
+body { margin: 0; overflow: hidden; background: #111; color: white; font-family: sans-serif; }
+#toolbar { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6);
+padding: 10px; border-radius: 6px; }
+#toolbar input, #toolbar button { margin: 4px; display: block; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+<input type="file" id="fileInput" accept=".lxp">
+<button id="saveBtn">Save File</button>
+<input type="color" id="colorPicker" value="#00ffff">
+<input type="range" id="thickness" min="1" max="20" value="2">
+</div>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let curves = [], selectedCurve = null, selectedPoint = null, scale = 1.0, offsetX = 0, offsetY = 0;
+let draggingCanvas = false, draggingPoint = false, draggingCurve = false, lastX = 0, lastY = 0;
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    draw();
+}
+window.addEventListener("resize", resize);
+
+document.getElementById("fileInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        curves = JSON.parse(evt.target.result).curves;
+        selectedCurve = null;
+        selectedPoint = null;
+        draw();
+    };
+    reader.readAsText(file);
+});
+
+document.getElementById("saveBtn").addEventListener("click", function() {
+    const blob = new Blob([JSON.stringify({lexip_version:"1.0", curves: curves}, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "edited.lxp";
+    a.click();
+});
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+    for (let ci = 0; ci < curves.length; ci++) {
+        const c = curves[ci];
+        ctx.lineWidth = c.thickness;
+        ctx.strokeStyle = ci === selectedCurve ? "red" : `rgb(${c.color[0]}, ${c.color[1]}, ${c.color[2]})`;
+        ctx.beginPath();
+        for (let i = 0; i < c.points.length; i++) {
+            if (i === 0) ctx.moveTo(c.points[i][0], c.points[i][1]);
+            else ctx.lineTo(c.points[i][0], c.points[i][1]);
+        }
+        ctx.stroke();
+        if (ci === selectedCurve) {
+            ctx.fillStyle = "lime";
+            for (let i = 0; i < c.points.length; i++) {
+                ctx.beginPath();
+                ctx.arc(c.points[i][0], c.points[i][1], 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+    ctx.restore();
+}
+
+function toCurveSpace(x, y) { return [(x - offsetX) / scale, (y - offsetY) / scale]; }
+
+canvas.addEventListener("mousedown", (e) => {
+    lastX = e.clientX; lastY = e.clientY;
+    const [mx, my] = toCurveSpace(e.clientX, e.clientY);
+    for (let ci = 0; ci < curves.length; ci++) {
+        const pts = curves[ci].points;
+        for (let pi = 0; pi < pts.length; pi++) {
+            if (Math.hypot(mx - pts[pi][0], my - pts[pi][1]) < 8) {
+                selectedCurve = ci;
+                selectedPoint = pi;
+                draggingPoint = true;
+                draw();
+                return;
+            }
+        }
+    }
+    draggingCanvas = true;
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (draggingPoint && selectedCurve !== null) {
+        const [mx, my] = toCurveSpace(e.clientX, e.clientY);
+        curves[selectedCurve].points[selectedPoint] = [mx, my];
+    } else if (draggingCanvas) {
+        offsetX += dx; offsetY += dy;
+    }
+    lastX = e.clientX; lastY = e.clientY;
+    draw();
+});
+
+canvas.addEventListener("mouseup", () => { draggingCanvas = false; draggingPoint = false; });
+
+document.getElementById("colorPicker").addEventListener("input", (e) => {
+    if (selectedCurve === null) return;
+    const hex = e.target.value;
+    curves[selectedCurve].color = [parseInt(hex.substr(1,2),16), parseInt(hex.substr(3,2),16), parseInt(hex.substr(5,2),16)];
+    draw();
+});
+
+document.getElementById("thickness").addEventListener("input", (e) => {
+    if (selectedCurve === null) return;
+    curves[selectedCurve].thickness = parseFloat(e.target.value);
+    draw();
+});
+
+window.onload = resize;
+</script>
+</body>
+</html>
