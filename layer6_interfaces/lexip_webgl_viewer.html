@@ -5,7 +5,7 @@
 <title>Lexip Vector Viewer</title>
 <style>
 body { margin: 0; overflow: hidden; background: #111; color: white; font-family: sans-serif; }
-#fileInput { position: absolute; top: 10px; left: 10px; z-index: 10; }
+#fileInput { position: absolute; top: 10px; left: 10px; z-index: 10; background: #222; color: white; border: 1px solid #444; padding: 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -28,9 +28,13 @@ document.getElementById("fileInput").addEventListener("change", function(e) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(evt) {
-        const data = JSON.parse(evt.target.result);
-        curves = data.curves;
-        draw();
+        try {
+            const data = JSON.parse(evt.target.result);
+            curves = data.curves || [];
+            draw();
+        } catch(err) {
+            console.error("Failed parsing LXP payload structure:", err);
+        }
     };
     reader.readAsText(file);
 });
@@ -40,29 +44,69 @@ function draw() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
-    for (const curve of curves) {
-        const [r, g, b] = curve.color;
-        ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+    
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    for (let i = 0; i < curves.length; i++) {
+        const curve = curves[i];
+        const pts = curve.points;
+        if (!pts || pts.length < 2) continue;
+        
+        ctx.strokeStyle = `rgb(${curve.color[0]}, ${curve.color[1]}, ${curve.color[2]})`;
         ctx.lineWidth = curve.thickness;
+        
         ctx.beginPath();
-        for (let i = 0; i < curve.points.length; i++) {
-            if (i === 0) ctx.moveTo(curve.points[i][0], curve.points[i][1]);
-            else ctx.lineTo(curve.points[i][0], curve.points[i][1]);
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let j = 1; j < pts.length; j++) {
+            ctx.lineTo(pts[j][0], pts[j][1]);
         }
         ctx.stroke();
     }
     ctx.restore();
 }
 
-canvas.addEventListener("mousedown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+function toCurveSpace(x, y) { return [(x - offsetX) / scale, (y - offsetY) / scale]; }
+
+canvas.addEventListener("mousedown", (e) => { 
+    const rect = canvas.getBoundingClientRect();
+    dragging = true; 
+    lastX = e.clientX - rect.left; 
+    lastY = e.clientY - rect.top; 
+});
+
 canvas.addEventListener("mousemove", (e) => {
     if (!dragging) return;
-    offsetX += e.clientX - lastX;
-    offsetY += e.clientY - lastY;
-    lastX = e.clientX; lastY = e.clientY;
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    offsetX += currentX - lastX;
+    offsetY += currentY - lastY;
+    
+    lastX = currentX; 
+    lastY = currentY;
     draw();
 });
+
 canvas.addEventListener("mouseup", () => dragging = false);
+canvas.addEventListener("mouseleave", () => dragging = false);
+
+canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const [zoomX, zoomY] = toCurveSpace(mouseX, mouseY);
+    
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 1.0 / 1.1;
+    scale *= zoomFactor;
+    
+    offsetX = mouseX - zoomX * scale;
+    offsetY = mouseY - zoomY * scale;
+    draw();
+}, { passive: false });
+
 window.onload = resize;
 </script>
 </body>
