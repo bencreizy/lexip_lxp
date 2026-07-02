@@ -2,21 +2,13 @@
 # Unified Lexip CLI - convert, analyze, compress, render, animate, inspect
 import argparse
 import json
-import sys
-import os
+import numpy as np
 
-# Add paths to enable imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer1_data_lattice"))
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer3_geometric_conditioning"))
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer5_command_automation"))
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer7_extensions"))
-
-from lexip_batch_processor import LexipBatchProcessor
-from lexip_format import load_lxp, save_lxp
-from lexip_compression import compress_curve, decompress_curve
-from lexip_curve_analysis import curve_length, bounding_box, centroid
-from lexip_timeline import LexipTimeline
-from lexip_gpu_renderer import run_gpu_renderer
+# Rely on absolute package layout structure mappings to retain deployment portability
+from .lexip_batch_processor import LexipBatchProcessor
+from .lexip_format import load_lxp, save_lxp
+from .lexip_compression import compress_curve, decompress_curve
+from .lexip_curve_analysis import curve_length, bounding_box, centroid
 
 def cmd_convert(args):
     bp = LexipBatchProcessor(args.input, args.output)
@@ -28,43 +20,58 @@ def cmd_analyze(args):
 
 def cmd_compress(args):
     curves = load_lxp(args.input)["curves"]
-    comp = []
-    for c in curves:
-        comp.append({
+    comp = [
+        {
             "color": c["color"],
             "thickness": c["thickness"],
             "blob": compress_curve(c["points"]).hex()
-        })
-    with open(args.output, "w") as f:
-        json.dump({"compressed": comp}, f, indent=2)
+        }
+        for c in curves
+    ]
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump({"compressed": comp}, f, indent=2, ensure_ascii=False)
     print(f"Compressed file saved: {args.output}")
 
 def cmd_decompress(args):
-    with open(args.input, "r") as f:
+    with open(args.input, "r", encoding="utf-8") as f:
         data = json.load(f)
-    curves = []
-    for c in data["compressed"]:
-        curves.append({
+    curves = [
+        {
             "points": decompress_curve(bytes.fromhex(c["blob"])),
             "color": c["color"],
             "thickness": c["thickness"]
-        })
+        }
+        for c in data["compressed"]
+    ]
     save_lxp(curves, args.output)
     print(f"Decompressed file saved: {args.output}")
 
 def cmd_render(args):
+    from .lexip_gpu_renderer import run_gpu_renderer
     curves = load_lxp(args.input)["curves"]
     run_gpu_renderer(curves)
 
 def cmd_info(args):
     curves = load_lxp(args.input)["curves"]
     total_len = sum(curve_length(c["points"]) for c in curves)
-    all_pts = [p for c in curves for p in c["points"]]
+    
+    all_pts = []
+    for c in curves:
+        all_pts.extend(c["points"])
+        
+    if all_pts:
+        pts_arr = np.asarray(all_pts, dtype=np.float64)
+        bbox = bounding_box(pts_arr)
+        cent = centroid(pts_arr)
+    else:
+        bbox = (0.0, 0.0, 0.0, 0.0)
+        cent = (0.0, 0.0)
+
     print(json.dumps({
         "curve_count": len(curves),
         "total_length": total_len,
-        "bounding_box": bounding_box(all_pts) if all_pts else (0,0,0,0),
-        "centroid": centroid(all_pts) if all_pts else (0,0)
+        "bounding_box": bbox,
+        "centroid": cent
     }, indent=2))
 
 def build_cli():
@@ -99,6 +106,19 @@ def build_cli():
     p_inf = sub.add_parser("info", help="Display core metadata details.")
     p_inf.add_argument("input")
     p_inf.set_defaults(func=cmd_info)
+    
+    return parser
+
+def main():
+    parser = build_cli()
+    args = parser.parse_args()
+    if hasattr(args, "func"):
+        args.func(args)
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()    p_inf.set_defaults(func=cmd_info)
     
     return parser
 
