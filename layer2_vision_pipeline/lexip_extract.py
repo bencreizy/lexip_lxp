@@ -8,26 +8,36 @@ def extract_raw_curves(video_path, max_frames=None):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError(f"Cannot open video: {video_path}")
+        
     raw_curves = []
     frame_count = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frame_count += 1
-        if max_frames and frame_count > max_frames:
-            break
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 80, 160)
-        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+            frame_count += 1
+            if max_frames and frame_count > max_frames:
+                break
+                
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, 80, 160)
+            contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-        for c in contours:
-            if len(c) >= 5:
-                pts = c.reshape(-1, 2)
-                raw_curves.append({
-                    "points": pts.tolist(),
-                    "color": [0, 255, 255],
-                    "thickness": 1.0
-                })
-    cap.release()
+            # Avoid deep object overhead by referencing shape directly before standard conversion
+            for c in contours:
+                if c.shape[0] >= 5:
+                    # c has an inherent shape of (N, 1, 2) from findContours; 
+                    # squeezing handles the matrix reshape efficiently
+                    pts = np.squeeze(c, axis=1)
+                    raw_curves.append({
+                        "points": pts.tolist(),
+                        "color": [0, 255, 255],
+                        "thickness": 1.0
+                    })
+    finally:
+        cap.release()
+        
     return raw_curves
