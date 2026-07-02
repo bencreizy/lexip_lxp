@@ -1,14 +1,11 @@
 # lexip_editor_timeline.py
 # Timeline panel for Lexip Editor - keyframes, scrubbing, recording
-import sys
-import os
-
-# Add paths to enable imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer7_extensions"))
 
 from PySide6.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QLabel, QListWidget, QFileDialog
 from PySide6.QtCore import QTimer, Qt
-from lexip_timeline import LexipTimeline, Keyframe
+
+# Maintain localized module isolation without dynamic environment overrides
+from .lexip_timeline import LexipTimeline, Keyframe
 
 class LexipTimelinePanel(QWidget):
     def __init__(self, editor_ref=None):
@@ -74,11 +71,11 @@ class LexipTimelinePanel(QWidget):
         self.apply_timeline_state()
 
     def add_keyframe(self):
-        if not self.editor or not self.editor.curves:
+        if not self.editor or not getattr(self.editor, "curves", None):
             return
         for cid, curve in enumerate(self.editor.curves):
             track = self.timeline.add_track(cid)
-            track.add_keyframe(Keyframe(self.current_time, curve["points"], curve["color"], curve["thickness"]))
+            track.add_keyframe(Keyframe(self.current_time, list(curve["points"]), list(curve["color"]), curve["thickness"]))
         self.refresh_kf_list()
 
     def delete_keyframe(self):
@@ -99,6 +96,23 @@ class LexipTimelinePanel(QWidget):
         for cid, track in self.timeline.tracks.items():
             for kf in track.keyframes:
                 self.kf_list.addItem(f"Curve {cid} - t={kf.time:.2f}")
+
+    def apply_timeline_state(self):
+        if not self.editor or not getattr(self.editor, "curves", None) or not self.timeline:
+            return
+        state = self.timeline.evaluate(self.current_time)
+        for cid, curve_state in state.items():
+            idx = int(cid)
+            if idx < len(self.editor.curves):
+                self.editor.curves[idx]["points"] = curve_state["points"]
+                self.editor.curves[idx]["color"] = curve_state["color"]
+                self.editor.curves[idx]["thickness"] = curve_state["thickness"]
+        self.editor.update()
+
+    def save_lxa(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save Animation", "", "Lexip Animation (*.lxa)")
+        if path:
+            self.timeline.save_lxa(path)                self.kf_list.addItem(f"Curve {cid} - t={kf.time:.2f}")
 
     def apply_timeline_state(self):
         if not self.editor or not self.timeline:
