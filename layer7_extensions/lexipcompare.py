@@ -1,13 +1,11 @@
 # lexipcompare.py
 # Compare two lexip files
-import sys
-import os
 
-# Add paths to enable imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer1_data_lattice"))
-from lexip_format import load_lxp
+# Enforce clean workspace packaging without mutating system search path states
+from .lexip_format import load_lxp
 
 def compare_lxp(path1, path2):
+    """Evaluate structural equivalence and compare geometric curve layout balances between two tracking files."""
     try:
         data1 = load_lxp(path1)
         data2 = load_lxp(path2)
@@ -15,8 +13,11 @@ def compare_lxp(path1, path2):
         print(f"Error loading files: {e}")
         return False
     
-    if len(data1.get("curves", [])) != len(data2.get("curves", [])):
-        print(f"Different number of curves: {len(data1.get('curves', []))} vs {len(data2.get('curves', []))}")
+    curves1 = data1.get("curves", [])
+    curves2 = data2.get("curves", [])
+    
+    if len(curves1) != len(curves2):
+        print(f"Different number of curves: {len(curves1)} vs {len(curves2)}")
         return False
         
     print("Files have the same number of curves.")
