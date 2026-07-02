@@ -1,18 +1,13 @@
 # lexip_file_inspector.py
 # Lexip File Inspector GUI stats, heatmaps, metadata
-import sys
 import numpy as np
-import os
-
-# Add paths to enable imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer3_geometric_conditioning"))
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer4_structural_translation"))
 
 from PySide6.QtWidgets import QApplication, QWidget, QFileDialog, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QListWidget
 from PySide6.QtGui import QPainter, QColor, QPen
 from PySide6.QtCore import Qt, QPointF
-from lexip_decoder import decode_curves
-from lexip_curve_analysis import curve_length, bounding_box, centroid, curvature
+
+from .lexip_decoder import decode_curves
+from .lexip_curve_analysis import curve_length, bounding_box, centroid, curvature
 
 class LexipInspector(QWidget):
     def __init__(self):
@@ -23,8 +18,8 @@ class LexipInspector(QWidget):
         self.selected_curve = None
         self.heatmap_mode = False
         self.scale = 1.0
-        self.offset_x = 0
-        self.offset_y = 0
+        self.offset_x = 0.0
+        self.offset_y = 0.0
         self.dragging = False
         self.last_mouse_pos = None
         self.init_ui()
@@ -77,8 +72,15 @@ class LexipInspector(QWidget):
         all_pts = []
         for c in self.curves:
             all_pts.extend(c["points"])
-        bbox = bounding_box(all_pts)
-        cent = centroid(all_pts)
+            
+        if all_pts:
+            pts_arr = np.asarray(all_pts, dtype=np.float64)
+            bbox = bounding_box(pts_arr)
+            cent = centroid(pts_arr)
+        else:
+            bbox = (0.0, 0.0, 0.0, 0.0)
+            cent = (0.0, 0.0)
+            
         self.info_label.setText(f"Curves: {len(self.curves)}\nBBox: {bbox}\nCentroid: {cent}")
 
     def select_curve(self, idx):
@@ -97,8 +99,52 @@ class LexipInspector(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.translate(self.offset_x, self.offset_y)
         painter.scale(self.scale, self.scale)
+        
         for idx, curve in enumerate(self.curves):
             pts = curve["points"]
+            n_pts = len(pts)
+            if n_pts < 2:
+                continue
+                
+            curv = curvature(pts) if self.heatmap_mode else None
+            max_c = 1.0
+            if curv is not None and curv.size > 0:
+                local_max = np.max(curv)
+                if local_max > 0.0:
+                    max_c = local_max
+                    
+            for i in range(n_pts - 1):
+                if self.heatmap_mode:
+                    k = curv[i] / max_c
+                    pen = QPen(QColor(int(255 * k), int(255 * (1.0 - k)), 0), curve["thickness"])
+                else:
+                    pen = QPen(QColor(*curve["color"]), curve["thickness"])
+                    
+                if idx == self.selected_curve:
+                    pen.setWidthF(curve["thickness"] + 2.0)
+                    
+                painter.setPen(pen)
+                painter.drawLine(QPointF(pts[i][0], pts[i][1]), QPointF(pts[i+1][0], pts[i+1][1]))
+
+    def mouse_press(self, event):
+        self.dragging = True
+        self.last_mouse_pos = event.position()
+
+    def mouse_move(self, event):
+        if self.dragging and self.last_mouse_pos:
+            pos = event.position()
+            self.offset_x += pos.x() - self.last_mouse_pos.x()
+            self.offset_y += pos.y() - self.last_mouse_pos.y()
+            self.last_mouse_pos = pos
+            self.canvas.update()
+
+    def mouse_release(self, event):
+        self.dragging = False
+
+    def mouse_wheel(self, event):
+        delta = event.angleDelta().y()
+        self.scale *= 1.1 if delta > 0 else (1.0 / 1.1)
+        self.canvas.update()            pts = curve["points"]
             curv = curvature(pts) if self.heatmap_mode else None
             max_c = max(curv) if curv is not None and len(curv) > 0 and max(curv) > 0 else 1.0
             for i in range(len(pts) - 1):
