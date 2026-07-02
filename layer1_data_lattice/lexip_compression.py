@@ -1,66 +1,57 @@
 # lexip_compression.py
-# Lexip Compression Engine - quantization, delta encoding, packing
+# Optimized Lexip Compression Engine - High-Performance Geometry Packing
 import numpy as np
 import zlib
 
 def quantize_points(points, scale=100.0):
     """Convert float points to int16 using scale factor."""
-    pts = np.array(points, dtype=float)
-    q = np.round(pts * scale).astype(np.int16)
-    return q
+    pts = np.asarray(points, dtype=np.float64)
+    return np.round(pts * scale).astype(np.int16)
 
 def dequantize_points(qpoints, scale=100.0):
     """Convert int16 coordinates back to coordinate float lists."""
-    q = np.array(qpoints, dtype=np.int16)
-    return (q.astype(float) / scale).tolist()
+    q = np.asarray(qpoints, dtype=np.int16)
+    return (q.astype(np.float64) / scale).tolist()
 
 def delta_encode(int_points):
-    """Encode sequential steps as geometric delta derivatives."""
-    pts = np.array(int_points, dtype=np.int16)
-    deltas = np.zeros_like(pts)
-    if len(pts) == 0:
-        return deltas
+    """Encode sequential steps as geometric delta derivatives via vector diff."""
+    pts = np.asarray(int_points, dtype=np.int16)
+    if pts.shape[0] == 0:
+        return pts
+    deltas = np.empty_like(pts)
     deltas[0] = pts[0]
-    for i in range(1, len(pts)):
-        deltas[i] = pts[i] - pts[i - 1]
+    deltas[1:] = np.diff(pts, axis=0)
     return deltas
 
 def delta_decode(deltas):
-    """Decode derivative changes back to static coordinate values."""
-    pts = np.zeros_like(deltas)
-    if len(deltas) == 0:
-        return pts
-    pts[0] = deltas[0]
-    for i in range(1, len(deltas)):
-        pts[i] = pts[i - 1] + deltas[i]
-    return pts
-
-def zigzag_encode(n):
-    return (n << 1) ^ (n >> 15)
-
-def zigzag_decode(n):
-    return (n >> 1) ^ -(n & 1)
+    """Decode derivative changes back to static values via vector cumsum."""
+    d = np.asarray(deltas, dtype=np.int16)
+    if d.shape[0] == 0:
+        return d
+    return np.cumsum(d, axis=0, dtype=np.int16)
 
 def zigzag_array(arr):
-    return np.vectorize(zigzag_encode)(arr).astype(np.uint16)
+    """Vectorized 16-bit zigzag encoding across entire numpy array."""
+    a = np.asarray(arr, dtype=np.int16)
+    return ((a << 1) ^ (a >> 15)).astype(np.uint16)
 
 def unzigzag_array(arr):
-    return np.vectorize(zigzag_decode)(arr).astype(np.int16)
+    """Vectorized 16-bit inverse zigzag decoding across entire numpy array."""
+    a = np.asarray(arr, dtype=np.uint16)
+    return ((a >> 1) ^ -(a & 1)).astype(np.int16)
 
 def compress_curve(points, scale=100.0):
     """Compress absolute floats to localized, zig-zag delta-byte buffers."""
     q = quantize_points(points, scale)
     d = delta_encode(q)
     z = zigzag_array(d)
-    flat = z.flatten().astype(np.uint16)
-    raw = flat.tobytes()
-    return zlib.compress(raw, level=9)
+    return zlib.compress(z.tobytes(), level=9)
 
 def decompress_curve(blob, scale=100.0):
     """Reconstitute raw float structures out of compressed zlib payloads."""
     raw = zlib.decompress(blob)
     arr = np.frombuffer(raw, dtype=np.uint16)
-    if len(arr) % 2 != 0:
+    if arr.shape[0] % 2 != 0:
         raise ValueError("Corrupt compressed curve")
     z = arr.reshape((-1, 2))
     d = unzigzag_array(z)
@@ -68,9 +59,9 @@ def decompress_curve(blob, scale=100.0):
     return dequantize_points(q, scale)
 
 def pack_curve_gpu(points):
-    pts = np.array(points, dtype=np.float32)
-    return pts.flatten().tobytes()
+    """Contiguous flattening for direct GPU memory boundaries."""
+    return np.asarray(points, dtype=np.float32).tobytes()
 
 def unpack_curve_gpu(blob):
-    arr = np.frombuffer(blob, dtype=np.float32)
-    return arr.reshape((-1, 2)).tolist()
+    """Unpack raw byte stream back to coordinate space."""
+    return np.frombuffer(blob, dtype=np.float32).reshape((-1, 2)).tolist()
