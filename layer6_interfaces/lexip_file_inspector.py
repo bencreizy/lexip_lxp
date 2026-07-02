@@ -1,5 +1,5 @@
 # lexip_file_inspector.py
-# Lexip File Inspector GUI stats, heatmaps, metadata
+# Lexip File Inspector GUI - stats, heatmaps, metadata
 import numpy as np
 
 from PySide6.QtWidgets import QApplication, QWidget, QFileDialog, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QListWidget
@@ -123,84 +123,6 @@ class LexipInspector(QWidget):
                 if idx == self.selected_curve:
                     pen.setWidthF(curve["thickness"] + 2.0)
                     
-                painter.setPen(pen)
-                painter.drawLine(QPointF(pts[i][0], pts[i][1]), QPointF(pts[i+1][0], pts[i+1][1]))
-
-    def mouse_press(self, event):
-        self.dragging = True
-        self.last_mouse_pos = event.position()
-
-    def mouse_move(self, event):
-        if self.dragging and self.last_mouse_pos:
-            pos = event.position()
-            self.offset_x += pos.x() - self.last_mouse_pos.x()
-            self.offset_y += pos.y() - self.last_mouse_pos.y()
-            self.last_mouse_pos = pos
-            self.canvas.update()
-
-    def mouse_release(self, event):
-        self.dragging = False
-
-    def mouse_wheel(self, event):
-        delta = event.angleDelta().y()
-        self.scale *= 1.1 if delta > 0 else (1.0 / 1.1)
-        self.canvas.update()        painter.scale(self.scale, self.scale)
-        
-        for idx, curve in enumerate(self.curves):
-            pts = curve["points"]
-            n_pts = len(pts)
-            if n_pts < 2:
-                continue
-                
-            curv = curvature(pts) if self.heatmap_mode else None
-            max_c = 1.0
-            if curv is not None and curv.size > 0:
-                local_max = np.max(curv)
-                if local_max > 0.0:
-                    max_c = local_max
-                    
-            for i in range(n_pts - 1):
-                if self.heatmap_mode:
-                    k = curv[i] / max_c
-                    pen = QPen(QColor(int(255 * k), int(255 * (1.0 - k)), 0), curve["thickness"])
-                else:
-                    pen = QPen(QColor(*curve["color"]), curve["thickness"])
-                    
-                if idx == self.selected_curve:
-                    pen.setWidthF(curve["thickness"] + 2.0)
-                    
-                painter.setPen(pen)
-                painter.drawLine(QPointF(pts[i][0], pts[i][1]), QPointF(pts[i+1][0], pts[i+1][1]))
-
-    def mouse_press(self, event):
-        self.dragging = True
-        self.last_mouse_pos = event.position()
-
-    def mouse_move(self, event):
-        if self.dragging and self.last_mouse_pos:
-            pos = event.position()
-            self.offset_x += pos.x() - self.last_mouse_pos.x()
-            self.offset_y += pos.y() - self.last_mouse_pos.y()
-            self.last_mouse_pos = pos
-            self.canvas.update()
-
-    def mouse_release(self, event):
-        self.dragging = False
-
-    def mouse_wheel(self, event):
-        delta = event.angleDelta().y()
-        self.scale *= 1.1 if delta > 0 else (1.0 / 1.1)
-        self.canvas.update()            pts = curve["points"]
-            curv = curvature(pts) if self.heatmap_mode else None
-            max_c = max(curv) if curv is not None and len(curv) > 0 and max(curv) > 0 else 1.0
-            for i in range(len(pts) - 1):
-                if self.heatmap_mode:
-                    k = curv[i] / max_c
-                    pen = QPen(QColor(int(255 * k), int(255 * (1 - k)), 0), curve["thickness"])
-                else:
-                    pen = QPen(QColor(*curve["color"]), curve["thickness"])
-                if idx == self.selected_curve:
-                    pen.setWidthF(curve["thickness"] + 2)
                 painter.setPen(pen)
                 painter.drawLine(QPointF(pts[i][0], pts[i][1]), QPointF(pts[i+1][0], pts[i+1][1]))
 
