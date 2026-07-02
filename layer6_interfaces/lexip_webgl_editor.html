@@ -5,9 +5,10 @@
 <title>Lexip Web Vector Editor</title>
 <style>
 body { margin: 0; overflow: hidden; background: #111; color: white; font-family: sans-serif; }
-#toolbar { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.6);
-padding: 10px; border-radius: 6px; }
-#toolbar input, #toolbar button { margin: 4px; display: block; }
+#toolbar { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.8);
+padding: 10px; border-radius: 6px; border: 1px solid #333; }
+#toolbar input, #toolbar button { margin: 4px; display: block; background: #222; color: white; border: 1px solid #444; padding: 4px; border-radius: 4px; }
+#toolbar input[type="color"] { padding: 0; border: none; width: 40px; height: 30px; }
 </style>
 </head>
 <body>
@@ -36,10 +37,15 @@ document.getElementById("fileInput").addEventListener("change", function(e) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(evt) {
-        curves = JSON.parse(evt.target.result).curves;
-        selectedCurve = null;
-        selectedPoint = null;
-        draw();
+        try {
+            const data = JSON.parse(evt.target.result);
+            curves = data.curves || [];
+            selectedCurve = null;
+            selectedPoint = null;
+            draw();
+        } catch(err) {
+            console.error("Invalid LXP formatting payload structure", err);
+        }
     };
     reader.readAsText(file);
 });
@@ -50,6 +56,7 @@ document.getElementById("saveBtn").addEventListener("click", function() {
     a.href = URL.createObjectURL(blob);
     a.download = "edited.lxp";
     a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 100);
 });
 
 function draw() {
@@ -57,21 +64,26 @@ function draw() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
+    
     for (let ci = 0; ci < curves.length; ci++) {
         const c = curves[ci];
         ctx.lineWidth = c.thickness;
         ctx.strokeStyle = ci === selectedCurve ? "red" : `rgb(${c.color[0]}, ${c.color[1]}, ${c.color[2]})`;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
         ctx.beginPath();
         for (let i = 0; i < c.points.length; i++) {
             if (i === 0) ctx.moveTo(c.points[i][0], c.points[i][1]);
             else ctx.lineTo(c.points[i][0], c.points[i][1]);
         }
         ctx.stroke();
+        
         if (ci === selectedCurve) {
             ctx.fillStyle = "lime";
             for (let i = 0; i < c.points.length; i++) {
                 ctx.beginPath();
-                ctx.arc(c.points[i][0], c.points[i][1], 4, 0, Math.PI * 2);
+                ctx.arc(c.points[i][0], c.points[i][1], 4 / scale, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -81,13 +93,29 @@ function draw() {
 
 function toCurveSpace(x, y) { return [(x - offsetX) / scale, (y - offsetY) / scale]; }
 
+function distToSegmentSq(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return (px - x1) * (px - x1) + (py - y1) * (py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const tx = x1 + t * dx;
+    const ty = y1 + t * dy;
+    return (px - tx) * (px - tx) + (py - ty) * (py - ty);
+}
+
 canvas.addEventListener("mousedown", (e) => {
-    lastX = e.clientX; lastY = e.clientY;
-    const [mx, my] = toCurveSpace(e.clientX, e.clientY);
+    const rect = canvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
+    const [mx, my] = toCurveSpace(lastX, lastY);
+    
+    // Explicit Point Detection Pass
     for (let ci = 0; ci < curves.length; ci++) {
         const pts = curves[ci].points;
         for (let pi = 0; pi < pts.length; pi++) {
-            if (Math.hypot(mx - pts[pi][0], my - pts[pi][1]) < 8) {
+            if (Math.hypot(mx - pts[pi][0], my - pts[pi][1]) < 8 / scale) {
                 selectedCurve = ci;
                 selectedPoint = pi;
                 draggingPoint = true;
@@ -96,9 +124,88 @@ canvas.addEventListener("mousedown", (e) => {
             }
         }
     }
+    
+    // Explicit Segment Detection Pass
+    for (let ci = 0; ci < curves.length; ci++) {
+        const pts = curves[ci].points;
+        for (let i = 0; i < pts.length - 1; i++) {
+            if (distToSegmentSq(mx, my, pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]) < (6 / scale) * (6 / scale)) {
+                selectedCurve = ci;
+                selectedPoint = null;
+                draggingCurve = true;
+                draw();
+                return;
+            }
+        }
+    }
+    
     draggingCanvas = true;
 });
 
+canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    const dx = currentX - lastX;
+    const dy = currentY - lastY;
+    
+    if (draggingPoint && selectedCurve !== null) {
+        const [mx, my] = toCurveSpace(currentX, currentY);
+        curves[selectedCurve].points[selectedPoint] = [mx, my];
+    } else if (draggingCurve && selectedCurve !== null) {
+        const pts = curves[selectedCurve].points;
+        for (let i = 0; i < pts.length; i++) {
+            pts[i][0] += dx / scale;
+            pts[i][1] += dy / scale;
+        }
+    } else if (draggingCanvas) {
+        offsetX += dx; 
+        offsetY += dy;
+    }
+    
+    lastX = currentX; 
+    lastY = currentY;
+    draw();
+});
+
+canvas.addEventListener("mouseup", () => { 
+    draggingCanvas = false; 
+    draggingPoint = false; 
+    draggingCurve = false; 
+});
+
+canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const [zoomX, zoomY] = toCurveSpace(mouseX, mouseY);
+    
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 1.0 / 1.1;
+    scale *= zoomFactor;
+    
+    offsetX = mouseX - zoomX * scale;
+    offsetY = mouseY - zoomY * scale;
+    draw();
+}, { passive: false });
+
+document.getElementById("colorPicker").addEventListener("input", (e) => {
+    if (selectedCurve === null) return;
+    const hex = e.target.value;
+    curves[selectedCurve].color = [parseInt(hex.substr(1,2),16), parseInt(hex.substr(3,2),16), parseInt(hex.substr(5,2),16)];
+    draw();
+});
+
+document.getElementById("thickness").addEventListener("input", (e) => {
+    if (selectedCurve === null) return;
+    curves[selectedCurve].thickness = parseFloat(e.target.value);
+    draw();
+});
+
+window.onload = resize;
+</script>
+</body>
+</html>
 canvas.addEventListener("mousemove", (e) => {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     if (draggingPoint && selectedCurve !== null) {
