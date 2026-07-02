@@ -4,9 +4,6 @@ import sys
 import ctypes
 import numpy as np
 
-# Add paths to enable imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "layer1_data_lattice"))
-
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from OpenGL.GL import *
@@ -39,6 +36,7 @@ class LexipGLWidget(QOpenGLWidget):
     def __init__(self):
         super().__init__()
         self.curves = []
+        self.vaos = []
         self.vbos = []
         self.counts = []
         self.scale = 0.002
@@ -60,22 +58,49 @@ class LexipGLWidget(QOpenGLWidget):
 
     def load_curves(self, curves):
         self.makeCurrent()
+        
+        # Clean up existing GPU resource state contexts safely
+        if self.vaos:
+            glDeleteVertexArrays(len(self.vaos), self.vaos)
         if self.vbos:
             glDeleteBuffers(len(self.vbos), self.vbos)
+            
         self.curves = curves
+        self.vaos = []
         self.vbos = []
         self.counts = []
+        
         for curve in curves:
-            pts = np.array(curve["points"], dtype=np.float32)
-            color = np.array(curve["color"], dtype=np.float32) / 255.0
-            colors = np.tile(color, (len(pts), 1)).astype(np.float32)
+            pts = np.asarray(curve["points"], dtype=np.float32)
+            n_pts = pts.shape[0]
+            if n_pts == 0:
+                continue
+                
+            color = np.asarray(curve["color"], dtype=np.float32) / 255.0
+            colors = np.tile(color, (n_pts, 1))
             data = np.hstack([pts, colors]).astype(np.float32)
             
+            # Bind state mutations inside a uniform Vertex Array Object configuration block
+            vao = glGenVertexArrays(1)
             vbo = glGenBuffers(1)
+            
+            glBindVertexArray(vao)
             glBindBuffer(GL_ARRAY_BUFFER, vbo)
             glBufferData(GL_ARRAY_BUFFER, data.nbytes, data, GL_STATIC_DRAW)
+            
+            # Attribute 0: Coordinate layout pairs
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(0))
+            
+            # Attribute 1: Normalized RGB values
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(8))
+            
+            self.vaos.append(vao)
             self.vbos.append(vbo)
-            self.counts.append(len(pts))
+            self.counts.append(n_pts)
+            
+        glBindVertexArray(0)
         self.update()
 
     def paintGL(self):
@@ -83,14 +108,14 @@ class LexipGLWidget(QOpenGLWidget):
         glUseProgram(self.program)
         glUniform1f(self.u_scale, self.scale)
         glUniform2f(self.u_offset, self.offset[0], self.offset[1])
-        for vbo, count, curve in zip(self.vbos, self.counts, self.curves):
-            glBindBuffer(GL_ARRAY_BUFFER, vbo)
-            glEnableVertexAttribArray(0)
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(0))
-            glEnableVertexAttribArray(1)
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 20, ctypes.c_void_p(8))
-            glLineWidth(max(1.0, curve.get("thickness", 1.0)))
+        
+        # Stream pipeline layout using encapsulated state contexts directly
+        for vao, count, curve in zip(self.vaos, self.counts, self.curves):
+            glBindVertexArray(vao)
+            glLineWidth(max(1.0, float(curve.get("thickness", 1.0))))
             glDrawArrays(GL_LINE_STRIP, 0, count)
+            
+        glBindVertexArray(0)
 
     def wheelEvent(self, event):
         self.scale *= 1.1 if event.angleDelta().y() > 0 else (1.0 / 1.1)
@@ -129,4 +154,7 @@ def run_gpu_renderer(curves):
     win = LexipGPURenderer()
     win.load_curves(curves)
     win.show()
-    sys.exit(app.exec())
+    # Safe fallback check to bypass sys.exit trace panics inside execution subshells
+    ret = app.exec()
+    if QApplication.instance() is None:
+        sys.exit(ret)
