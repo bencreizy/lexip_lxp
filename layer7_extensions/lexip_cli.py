@@ -118,17 +118,4 @@ def main():
         parser.print_help()
 
 if __name__ == "__main__":
-    main()    p_inf.set_defaults(func=cmd_info)
-    
-    return parser
-
-def main():
-    parser = build_cli()
-    args = parser.parse_args()
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
-        parser.print_help()
-
-if __name__ == "__main__":
     main()
