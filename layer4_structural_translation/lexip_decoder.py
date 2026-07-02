@@ -8,7 +8,7 @@ def decode_curve(curve_dict):
     pts = np.asarray(curve_dict["points"], dtype=np.float64)
     return {
         "points": pts.tolist(),
-        "color": tuple(int(c) for c in curve_dict["color"]),
+        "color": list(int(c) for c in curve_dict["color"]),
         "thickness": float(curve_dict["thickness"])
     }
 
