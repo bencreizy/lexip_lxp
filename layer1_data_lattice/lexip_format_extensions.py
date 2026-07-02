@@ -11,7 +11,7 @@ def save_lxp2(curves, path):
         "version": 2,
         "curves": curves
     }
-    raw = json.dumps(data).encode("utf-8")
+    raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
     comp = zlib.compress(raw, level=9)
     with open(path, "wb") as f:
         f.write(comp)
@@ -29,32 +29,42 @@ def save_lxm(motion_paths, path):
         "version": 1,
         "motion": motion_paths
     }
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 def load_lxm(path):
     """Load raw motion paths."""
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data["motion"]
 
 def save_lxa2(timeline, path):
     """Save a Lexip Timeline layout into optimized streamable binary files."""
+    payload = bytearray()
+    
+    # Header: Version, Duration, Track Count
+    payload.extend(struct.pack("<I", 2))
+    payload.extend(struct.pack("<f", float(timeline.duration)))
+    payload.extend(struct.pack("<I", len(timeline.tracks)))
+    
+    for cid, track in timeline.tracks.items():
+        payload.extend(struct.pack("<I", int(cid)))
+        payload.extend(struct.pack("<I", len(track.keyframes)))
+        
+        for kf in track.keyframes:
+            payload.extend(struct.pack("<f", float(kf.time)))
+            payload.extend(struct.pack("<I", len(kf.points)))
+            
+            # Pack all points continuously to reduce packing calls
+            for x, y in kf.points:
+                payload.extend(struct.pack("<ff", float(x), float(y)))
+                
+            r, g, b = kf.color
+            payload.extend(struct.pack("<BBB", int(r), int(g), int(b)))
+            payload.extend(struct.pack("<f", float(kf.thickness)))
+            
     with open(path, "wb") as f:
-        f.write(struct.pack("<I", 2))
-        f.write(struct.pack("<f", timeline.duration))
-        f.write(struct.pack("<I", len(timeline.tracks)))
-        for cid, track in timeline.tracks.items():
-            f.write(struct.pack("<I", int(cid)))
-            f.write(struct.pack("<I", len(track.keyframes)))
-            for kf in track.keyframes:
-                f.write(struct.pack("<f", kf.time))
-                f.write(struct.pack("<I", len(kf.points)))
-                for x, y in kf.points:
-                    f.write(struct.pack("<ff", float(x), float(y)))
-                r, g, b = kf.color
-                f.write(struct.pack("BBB", int(r), int(g), int(b)))
-                f.write(struct.pack("<f", float(kf.thickness)))
+        f.write(payload)
 
 def load_lxa2(path):
     """Read streamable binary animation formats safely into memory lattices."""
@@ -84,11 +94,14 @@ def load_lxa2(path):
         for _ in range(kf_count):
             time_val, = read("<f")
             point_count, = read("<I")
+            
             pts = []
             for _ in range(point_count):
                 x, y = read("<ff")
                 pts.append((x, y))
-            r, g, b = read("BBB")
+                
+            r, g, b = read("<BBB")
             thickness, = read("<f")
             track.add_keyframe(Keyframe(time_val, pts, [r, g, b], thickness))
+            
     return tl
