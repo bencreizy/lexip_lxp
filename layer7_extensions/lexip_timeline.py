@@ -7,11 +7,11 @@ def lerp(a, b, t):
     return a + (b - a) * t
 
 def smoothstep(t):
-    return t * t * (3 - 2 * t)
+    return t * t * (3.0 - 2.0 * t)
 
 def interp_points(p1, p2, t):
-    arr1 = np.array(p1, dtype=float)
-    arr2 = np.array(p2, dtype=float)
+    arr1 = np.asarray(p1, dtype=np.float64)
+    arr2 = np.asarray(p2, dtype=np.float64)
     if arr1.shape != arr2.shape:
         return p1
     return (arr1 + (arr2 - arr1) * t).tolist()
@@ -56,9 +56,15 @@ class CurveTrack:
             if k1.time <= t <= k2.time:
                 dt = (t - k1.time) / (k2.time - k1.time + 1e-9)
                 dt = smoothstep(dt)
+                
+                # Fully vectorized color interpolation to prevent inner list comprehension overhead
+                c1 = np.asarray(k1.color, dtype=np.float64)
+                c2 = np.asarray(k2.color, dtype=np.float64)
+                interp_color = (c1 + (c2 - c1) * dt).astype(np.int32).tolist()
+                
                 return {
                     "points": interp_points(k1.points, k2.points, dt),
-                    "color": [int(lerp(k1.color[j], k2.color[j], dt)) for j in range(3)],
+                    "color": interp_color,
                     "thickness": float(lerp(k1.thickness, k2.thickness, dt))
                 }
         return None
@@ -76,7 +82,12 @@ class LexipTimeline:
 
     def evaluate(self, t):
         t = max(0.0, min(self.duration, t))
-        return {cid: track.evaluate(t) for cid, track in self.tracks.items() if track.evaluate(t) is not None}
+        res = {}
+        for cid, track in self.tracks.items():
+            val = track.evaluate(t)
+            if val is not None:
+                res[cid] = val
+        return res
 
     def to_dict(self):
         return {
@@ -85,12 +96,12 @@ class LexipTimeline:
         }
 
     def save_lxa(self, path):
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @staticmethod
     def load_lxa(path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         tl = LexipTimeline(duration=data["duration"])
         for cid, kflist in data["tracks"].items():
