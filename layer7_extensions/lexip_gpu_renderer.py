@@ -109,65 +109,6 @@ class LexipGLWidget(QOpenGLWidget):
         glUniform1f(self.u_scale, self.scale)
         glUniform2f(self.u_offset, self.offset[0], self.offset[1])
         
-        # Stream pipeline layout using bound state contexts natively
-        for vao, count, curve in zip(self.vaos, self.counts, self.curves):
-            glBindVertexArray(vao)
-            glLineWidth(max(1.0, float(curve.get("thickness", 1.0))))
-            glDrawArrays(GL_LINE_STRIP, 0, count)
-            
-        glBindVertexArray(0)
-
-    def wheelEvent(self, event):
-        self.scale *= 1.1 if event.angleDelta().y() > 0 else (1.0 / 1.1)
-        self.update()
-
-    def mousePressEvent(self, event):
-        self.dragging = True
-        self.last_mouse = event.position()
-
-    def mouseMoveEvent(self, event):
-        if self.dragging and self.last_mouse:
-            pos = event.position()
-            self.offset[0] += (pos.x() - self.last_mouse.x()) * 0.002
-            self.offset[1] -= (pos.y() - self.last_mouse.y()) * 0.002
-            self.last_mouse = pos
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        self.dragging = False
-
-class LexipGPURenderer(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Lexip GPU Renderer")
-        self.resize(1200, 900)
-        layout = QVBoxLayout()
-        self.gl = LexipGLWidget()
-        layout.addWidget(self.gl)
-        self.setLayout(layout)
-
-    def load_curves(self, curves):
-        self.gl.load_curves(curves)
-
-def run_gpu_renderer(curves):
-    app = QApplication.instance() or QApplication(sys.argv)
-    win = LexipGPURenderer()
-    win.load_curves(curves)
-    win.show()
-    
-    ret = app.exec()
-    if QApplication.instance() is None:
-        sys.exit(ret)            self.counts.append(n_pts)
-            
-        glBindVertexArray(0)
-        self.update()
-
-    def paintGL(self):
-        glClear(GL_COLOR_BUFFER_BIT)
-        glUseProgram(self.program)
-        glUniform1f(self.u_scale, self.scale)
-        glUniform2f(self.u_offset, self.offset[0], self.offset[1])
-        
         # Stream pipeline layout using encapsulated state contexts directly
         for vao, count, curve in zip(self.vaos, self.counts, self.curves):
             glBindVertexArray(vao)
@@ -213,7 +154,7 @@ def run_gpu_renderer(curves):
     win = LexipGPURenderer()
     win.load_curves(curves)
     win.show()
-    # Safe fallback check to bypass sys.exit trace panics inside execution subshells
+    
     ret = app.exec()
     if QApplication.instance() is None:
         sys.exit(ret)
