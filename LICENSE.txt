@@ -1,10 +1,47 @@
-Proprietary Software License
+Commercial Software License Agreement (CSLA)
+Version 1.0
 
-Copyright (c) 2026 Lexip
+Copyright (c) 2026 Lexip Corporation
 All rights reserved.
 
-This SDK code layout, specification tier, and asset manifest repository are strictly proprietary.
-Access, usage, and compilation are reserved exclusively for approved technology partners,
-paying clients, or verified designated entities bound by the framework EULA. Distributed
-deployment files must pass positive definite integrity validations before runtime execution loops
-initialize.
+GRANT OF LICENSE
+Subject to the terms of this Agreement, Lexip Corporation ("Licensor") grants to the licensee 
+("Licensee") a non-exclusive, non-transferable, revocable license to use this software and 
+documentation ("Software") for commercial purposes.
+
+PERMITTED USE
+- Licensee may install and use the Software on Licensee's systems
+- Licensee may modify the Software for internal business purposes
+- Licensee may integrate the Software into commercial products
+- Licensee may sublicense the Software to end-users under compatible terms
+
+RESTRICTIONS
+- Licensee shall not reverse engineer, decompile, or disassemble the Software
+- Licensee shall not remove or alter any copyright notices or proprietary markings
+- Licensee shall not publicly redistribute the Software without written consent
+- Licensee shall not use the Software to compete with Lexip's commercial offerings
+
+INTELLECTUAL PROPERTY
+All title, ownership rights, and intellectual property rights in the Software remain 
+exclusively with Licensor. No title to the intellectual property in the Software is 
+transferred to Licensee.
+
+WARRANTY DISCLAIMER
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+LIMITATION OF LIABILITY
+IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, 
+CONSEQUENTIAL, OR PUNITIVE DAMAGES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+TERM AND TERMINATION
+This License is effective until terminated. Licensor may terminate this License immediately 
+upon written notice if Licensee breaches any material term of this Agreement.
+
+GOVERNING LAW
+This Agreement shall be governed by and construed in accordance with the laws of the 
+jurisdiction in which Licensor is incorporated.
+
+CONTACT
+For licensing inquiries, contact: licensing@lexip.io

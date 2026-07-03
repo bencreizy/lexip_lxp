@@ -112,21 +112,4 @@ class LexipTimelinePanel(QWidget):
     def save_lxa(self):
         path, _ = QFileDialog.getSaveFileName(self, "Save Animation", "", "Lexip Animation (*.lxa)")
         if path:
-            self.timeline.save_lxa(path)                self.kf_list.addItem(f"Curve {cid} - t={kf.time:.2f}")
-
-    def apply_timeline_state(self):
-        if not self.editor or not self.timeline:
-            return
-        state = self.timeline.evaluate(self.current_time)
-        for cid, curve_state in state.items():
-            idx = int(cid)
-            if idx < len(self.editor.curves):
-                self.editor.curves[idx]["points"] = curve_state["points"]
-                self.editor.curves[idx]["color"] = curve_state["color"]
-                self.editor.curves[idx]["thickness"] = curve_state["thickness"]
-        self.editor.update()
-
-    def save_lxa(self):
-        path, _ = QFileDialog.getSaveFileName(self, "Save Animation", "", "Lexip Animation (*.lxa)")
-        if path:
             self.timeline.save_lxa(path)

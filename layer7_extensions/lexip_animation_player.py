@@ -110,13 +110,9 @@ class LexipAnimationPlayer(QWidget):
             self.update()
 
     def mouseReleaseEvent(self, event):
-        self.dragging = False    def mouseMoveEvent(self, event):
-        if self.dragging and self.last_mouse_pos:
-            pos = event.position()
-            self.offset_x += pos.x() - self.last_mouse_pos.x()
-            self.offset_y += pos.y() - self.last_mouse_pos.y()
-            self.last_mouse_pos = pos
-            self.update()
-
-    def mouseReleaseEvent(self, event):
         self.dragging = False
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        self.scale *= 1.1 if delta > 0 else (1.0 / 1.1)
+        self.update()

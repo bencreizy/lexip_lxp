@@ -3,12 +3,16 @@
 import argparse
 import json
 import numpy as np
+import sys
+from pathlib import Path
 
 # Rely on absolute package layout structure mappings to retain deployment portability
-from .lexip_batch_processor import LexipBatchProcessor
-from .lexip_format import load_lxp, save_lxp
-from .lexip_compression import compress_curve, decompress_curve
-from .lexip_curve_analysis import curve_length, bounding_box, centroid
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from layer5_command_automation.lexip_batch_processor import LexipBatchProcessor
+from layer1_data_lattice.lexip_format import load_lxp, save_lxp
+from layer1_data_lattice.lexip_compression import compress_curve, decompress_curve
+from layer3_geometric_conditioning.lexip_curve_analysis import curve_length, bounding_box, centroid
 
 def cmd_convert(args):
     bp = LexipBatchProcessor(args.input, args.output)
@@ -47,7 +51,7 @@ def cmd_decompress(args):
     print(f"Decompressed file saved: {args.output}")
 
 def cmd_render(args):
-    from .lexip_gpu_renderer import run_gpu_renderer
+    from layer7_extensions.lexip_gpu_renderer import run_gpu_renderer
     curves = load_lxp(args.input)["curves"]
     run_gpu_renderer(curves)
 

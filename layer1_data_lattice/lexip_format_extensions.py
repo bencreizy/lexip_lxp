@@ -83,7 +83,7 @@ def load_lxa2(path):
     duration, = read("<f")
     track_count, = read("<I")
 
-    from lexip_timeline import LexipTimeline, Keyframe
+    from .lexip_timeline import LexipTimeline, Keyframe
     tl = LexipTimeline(duration=duration)
 
     for _ in range(track_count):

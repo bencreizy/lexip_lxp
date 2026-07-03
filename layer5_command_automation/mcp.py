@@ -2,11 +2,17 @@
 # Master Control Program for the Lexip system
 
 # Enforce clean relative workspace references to preserve cross-layer module access
-from .lexip_extract import extract_raw_curves
-from .lexip_encoder import encode_curves
-from .lexip_decoder import decode_curves
-from .lexip_format import save_lxp
-from .lexip_motion import extract_motion_paths
+import sys
+from pathlib import Path
+
+# Add parent to path to allow cross-layer imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from layer2_vision_pipeline.lexip_extract import extract_raw_curves
+from layer4_structural_translation.lexip_encoder import encode_curves
+from layer4_structural_translation.lexip_decoder import decode_curves
+from layer1_data_lattice.lexip_format import save_lxp
+from layer2_vision_pipeline.lexip_motion import extract_motion_paths
 
 class MCP:
     def process_video(self, video_path, output_lxp, smooth=True, simplify=True, max_frames=None):
